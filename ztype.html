@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpectroType: Tactical Quantum Typing</title>
+    <style>
+        body {
+            margin: 0;
+            background: #05050d;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 20px #00ffcc, inset 0 0 20px rgba(0, 255, 187, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #uiLayer {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+        }
+        .stats-group {
+            display: flex;
+            gap: 20px;
+            background: rgba(10, 21, 38, 0.7);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            backdrop-filter: blur(4px);
+        }
+        #leftStats { color: #00ffcc; }
+        #rightStats { color: #ff0077; }
+        
+        /* Difficulty Selection Screen Overlays */
+        #menuOverlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 13, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+        #menuOverlay h1 {
+            color: #00ffcc;
+            font-size: 38px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 15px #00ffcc;
+            letter-spacing: 3px;
+        }
+        #menuOverlay p {
+            color: #8fa0b5;
+            margin-bottom: 30px;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 15px;
+        }
+        .diff-btn {
+            background: transparent;
+            color: #fff;
+            border: 2px solid #00ffcc;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+        }
+        .diff-btn:hover {
+            background: #00ffcc;
+            color: #05050d;
+            box-shadow: 0 0 20px #00ffcc;
+        }
+        #hardBtn {
+            border-color: #ff0077;
+            box-shadow: 0 0 10px rgba(255, 0, 119, 0.2);
+        }
+        #hardBtn:hover {
+            background: #ff0077;
+            color: #fff;
+            box-shadow: 0 0 20px #ff0077;
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <!-- Menu Screen -->
+    <div id="menuOverlay">
+        <h1>SPECTROTYPE</h1>
+        <p>ENGAGE TACTICAL KEYBOARD INTERCEPTION SYSTEMS</p>
+        <div class="btn-group">
+            <button class="diff-btn" id="easyBtn" onclick="startGame('easy')">EASY</button>
+            <button class="diff-btn" id="medBtn" onclick="startGame('medium')">MEDIUM</button>
+            <button class="diff-btn" id="hardBtn" onclick="startGame('hard')">HARD</button>
+        </div>
+    </div>
+
+    <!-- UI Overlay HUD -->
+    <div id="uiLayer">
+        <div class="stats-group" id="leftStats">
+            <div>SCORE: <span id="score">0</span></div>
+            <div>TIME: <span id="timer">0s</span></div>
+            <div>WPM: <span id="wpmCounter">0</span></div>
+        </div>
+        <div class="stats-group" id="rightStats">
+            <div>ACCURACY: <span id="accuracy">100%</span></div>
+            <div>STREAK: <span id="streak">0</span></div>
+        </div>
+    </div>
+    <canvas id="gameCanvas" width="900" height="650"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const streakEl = document.getElementById('streak');
+const timerEl = document.getElementById('timer');
+const wpmEl = document.getElementById('wpmCounter');
+const accuracyEl = document.getElementById('accuracy');
+const menuOverlay = document.getElementById('menuOverlay');
+
+// Game Metrics & Multipliers
+let score = 0;
+let streak = 0;
+let screenShake = 0;
+let gameActive = false;
+
+// Time & WPM Tracking Variables
+let startTime = null;
+let elapsedTime = 0; 
+let totalWordsTyped = 0;
+let correctKeys = 0;
+let totalKeysPressed = 0;
+
+// Configs based on difficulty selection
+let difficultySettings = {
+    speedModifier: 1,
+    spawnRateModifier: 1
+};
+
+const wordsList = [
+    'quantum', 'velocity', 'frontend', 'electron', 'nebula', 'matrix', 'gravity', 'cyberpunk', 'laser', 'cosmic',
+    'shredder', 'arcade', 'vector', 'bootstrap', 'javascript', 'algorithm', 'universe', 'blackhole', 'asteroid', 'galaxies',
+    'telescope', 'satellite', 'atmosphere', 'stratos', 'supernova', 'pulsar', 'quasar', 'orbit', 'trajectory', 'propulsion',
+    'spacecraft', 'astronaut', 'starlight', 'meteorite', 'eclipse', 'constellation', 'interstellar', 'parallax', 'infinity', 'singularity',
+    'thermodynamics', 'enthalpy', 'entropy', 'photon', 'schrodinger', 'resonance', 'spectrum', 'wavelength', 'refraction', 'diffraction',
+    'molecular', 'kinetics', 'mechanics', 'isotope', 'fission', 'fusion', 'radiation', 'magnetic', 'friction', 'inertia',
+    'developer', 'backend', 'responsive', 'interface', 'animation', 'component', 'database', 'framework', 'compiler', 'asynchronous',
+    'function', 'variable', 'endpoint', 'middleware', 'stylesheet', 'repository', 'deployment', 'terminal', 'cybersecurity', 'encryption',
+    'hypertext', 'protocol', 'bandwidth', 'overdrive', 'synthwave', 'glitch', 'neon', 'plasma', 'overlord', 'phantom',
+    'specter', 'vortex', 'blaster', 'interceptor', 'vanguard', 'sentinel', 'guardian', 'horizon', 'mainframe', 'accelerator',
+    'nanotech', 'odyssey', 'chronicle', 'oblivion', 'paradox', 'titanium', 'obsidian', 'catalyst', 'generator', 'simulation'
+];
+
+let enemies = [];
+let lasers = [];
+let particles = [];
+let stars = [];
+let targetEnemy = null;
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height - 70,
+    angle: 0,
+    targetAngle: 0,
+    laserSide: true
+};
+
+// Generate Ambient Space Stars
+for(let i=0; i<60; i++) {
+    stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        speed: Math.random() * 0.5 + 0.2
+    });
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 3 + 1;
+        this.speedX = (Math.random() - 0.5) * 6;
+        this.speedY = (Math.random() - 0.5) * 6;
+        this.color = color;
+        this.alpha = 1;
+    }
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.alpha -= 0.02;
+    }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Enemy {
+    constructor() {
+        this.word = wordsList[Math.floor(Math.random() * wordsList.length)];
+        this.remainingText = this.word;
+        this.typedText = "";
+        this.x = Math.random() * (canvas.width - 220) + 110;
+        this.y = -30;
+        let baseSpeed = Math.random() * 0.3 + 0.3;
+        this.speed = (baseSpeed * difficultySettings.speedModifier) + (score * 0.00015);
+    }
+    update() {
+        this.y += this.speed;
+    }
+    draw() {
+        ctx.font = 'bold 21px "Courier New"';
+        let typedWidth = ctx.measureText(this.typedText).width;
+        let totalWidth = ctx.measureText(this.word).width;
+
+        if (targetEnemy === this) {
+            ctx.strokeStyle = 'rgba(255, 0, 119, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.x - 10, this.y - 22, totalWidth + 20, 32);
+        }
+
+        ctx.fillStyle = '#00ffcc';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ffcc';
+        ctx.fillText(this.typedText, this.x, this.y);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 0;
+        ctx.fillText(this.remainingText, this.x + typedWidth, this.y);
+    }
+}
+
+class Laser {
+    constructor(startX, startY, targetX, targetY) {
+        this.startX = startX;
+        this.startY = startY;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.life = 7;
+    }
+    draw() {
+        if (this.life > 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff0077';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff0077';
+            ctx.moveTo(this.startX, this.startY);
+            ctx.lineTo(this.targetX, this.targetY);
+            ctx.stroke();
+            ctx.restore();
+            this.life--;
+        }
+    }
+}
+
+function createExplosion(x, y, color) {
+    for (let i = 0; i < 25; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function startGame(mode) {
+    menuOverlay.style.display = 'none';
+    gameActive = true;
+    startTime = Date.now();
+
+    if (mode === 'easy') {
+        difficultySettings.speedModifier = 0.8;
+        difficultySettings.spawnRateModifier = 1.3;
+    } else if (mode === 'medium') {
+        difficultySettings.speedModifier = 1.2;
+        difficultySettings.spawnRateModifier = 0.9;
+    } else if (mode === 'hard') {
+        difficultySettings.speedModifier = 1.7;
+        difficultySettings.spawnRateModifier = 0.6;
+    }
+
+    gameLoop();
+}
+
+let spawnTimer = 0;
+function handleGameElements() {
+    spawnTimer++;
+    let spawnLimit = Math.max(40, (130 - (score * 0.04)) * difficultySettings.spawnRateModifier);
+    if (spawnTimer > spawnLimit) { 
+        enemies.push(new Enemy());
+        spawnTimer = 0;
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    stars.forEach(star => {
+        star.y += star.speed;
+        if (star.y > canvas.height) star.y = 0;
+        ctx.fillRect(star.x, star.y, star.size, star.size);
+    });
+
+    if (screenShake > 0) {
+        ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+        screenShake *= 0.9;
+    }
+
+    if (startTime) {
+        elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+        timerEl.innerText = elapsedTime + "s";
+
+        if (elapsedTime > 0 && totalWordsTyped > 0) {
+            let wpm = Math.round((totalWordsTyped) / (elapsedTime / 60));
+            wpmEl.innerText = wpm;
+        }
+    }
+}
+
+function gameLoop() {
+    if (!gameActive) return;
+
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    handleGameElements();
+
+    if (targetEnemy) {
+        let dx = targetEnemy.x - player.x;
+        let dy = targetEnemy.y - player.y;
+        player.targetAngle = Math.atan2(dy, dx) + Math.PI / 2;
+    } else {
+        player.targetAngle = 0;
+    }
+    player.angle += (player.targetAngle - player.angle) * 0.2;
+
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    
+    let flameHeight = Math.random() * 15 + 15;
+    let gradient = ctx.createLinearGradient(0, 15, 0, 15 + flameHeight);
+    gradient.addColorStop(0, '#ffcc00');
+    gradient.addColorStop(0.5, '#ff3300');
+    gradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(-6, 15);
+    ctx.lineTo(0, 15 + flameHeight);
+    ctx.lineTo(6, 15);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00ffcc';
+
+    ctx.fillStyle = '#0a1526';
+    ctx.strokeStyle = '#00ffcc';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -35);         
+    ctx.lineTo(6, -15);         
+    ctx.lineTo(24, 15);         
+    ctx.lineTo(10, 10);         
+    ctx.lineTo(8, 20);          
+    ctx.lineTo(-8, 20);         
+    ctx.lineTo(-10, 10);        
+    ctx.lineTo(-24, 15);        
+    ctx.lineTo(-6, -15);        
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ff0077';
+    ctx.shadowColor = '#ff0077';
+    ctx.beginPath();
+    ctx.moveTo(0, -18);
+    ctx.lineTo(4, -5);
+    ctx.lineTo(3, 5);
+    ctx.lineTo(-3, 5);
+    ctx.lineTo(-4, -5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#00ffcc';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-20, 5); ctx.lineTo(-20, -5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20, 5); ctx.lineTo(20, -5); ctx.stroke();
+
+    ctx.restore();
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        e.update();
+        e.draw();
+
+        if (e.y >= player.y - 10) {
+            screenShake = 30;
+            gameActive = false;
+            let finalWpm = wpmEl.innerText;
+            let finalAcc = accuracyEl.innerText;
+            alert(`🛸 INVASION DETECTED! Ground Overrun.\n\nFinal Score: ${score}\nTime Survived: ${elapsedTime}s\nAverage WPM: ${finalWpm}\nAccuracy Rate: ${finalAcc}`);
+            document.location.reload();
+            return;
+        }
+    }
+
+    for (let i = lasers.length - 1; i >= 0; i--) {
+        lasers[i].draw();
+        if (lasers[i].life <= 0) lasers.splice(i, 1);
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].alpha <= 0) particles.splice(i, 1);
+    }
+
+    ctx.restore();
+    requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener('keydown', (e) => {
+    if (!gameActive) return;
+    
+    let key = e.key.toLowerCase();
+    if (key.length !== 1) return;
+
+    totalKeysPressed++;
+
+    if (targetEnemy === null) {
+        let potentialTargets = enemies.filter(enemy => enemy.remainingText.startsWith(key));
+        if (potentialTargets.length > 0) {
+            targetEnemy = potentialTargets.reduce((lowest, current) => current.y > lowest.y ? current : lowest);
+        }
+    }
+
+    if (targetEnemy !== null) {
+        if (targetEnemy.remainingText.startsWith(key)) {
+            correctKeys++;
+            let textWidth = ctx.measureText(targetEnemy.typedText).width;
+            
+            let wingOffset = player.laserSide ? 20 : -20;
+            player.laserSide = !player.laserSide; 
+
+            let laserOriginX = player.x + wingOffset * Math.cos(player.angle);
+            let laserOriginY = player.y + wingOffset * Math.sin(player.angle);
+
+            lasers.push(new Laser(laserOriginX, laserOriginY, targetEnemy.x + textWidth, targetEnemy.y));
+            screenShake = 3;
+
+            targetEnemy.typedText += targetEnemy.remainingText[0];
+            targetEnemy.remainingText = targetEnemy.remainingText.substring(1);
+
+            if (targetEnemy.remainingText.length === 0) {
+                streak++;
+                totalWordsTyped++;
+                score += (targetEnemy.word.length * 10) + (streak * 2);
+                
+                scoreEl.innerText = score;
+                streakEl.innerText = streak;
+
+                createExplosion(targetEnemy.x + (textWidth/2), targetEnemy.y, '#00ffcc');
+                screenShake = 12;
+
+                let index = enemies.indexOf(targetEnemy);
+                if (index > -1) enemies.splice(index, 1);
+                targetEnemy = null;
+            }
+        } else {
+            streak = 0;
+            streakEl.innerText = streak;
+        }
+    }
+
+    if (totalKeysPressed > 0) {
+        let accuracyPct = Math.round((correctKeys / totalKeysPressed) * 100);
+        accuracyEl.innerText = accuracyPct + "%";
+    }
+});
+</script>
+</body>
+</html>
