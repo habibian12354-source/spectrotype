@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google Analytics Tag (Bilkul Safe He) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-YB8BTMZEQG"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-YB8BTMZEQG');
+    </script>
 
-  gtag('config', 'G-YB8BTMZEQG');
-</script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SpectroType: Tactical Quantum Typing</title>
     <style>
         body {
@@ -21,9 +22,10 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
+            justify-content: flex-start;
+            min-height: 100vh;
             overflow: hidden;
+            touch-action: manipulation;
         }
         #gameContainer {
             position: relative;
@@ -31,27 +33,36 @@
             box-shadow: 0 0 20px #00ffcc, inset 0 0 20px rgba(0, 255, 187, 0.2);
             border-radius: 12px;
             overflow: hidden;
+            width: 95vw;
+            max-width: 900px;
+            height: 70vh;
+            max-height: 650px;
+            margin-top: 10px;
         }
         canvas {
             display: block;
+            width: 100%;
+            height: 100%;
         }
         #uiLayer {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
+            top: 10px;
+            left: 10px;
+            right: 10px;
             display: flex;
             justify-content: space-between;
             pointer-events: none;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: bold;
             text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+            z-index: 5;
         }
         .stats-group {
             display: flex;
-            gap: 20px;
-            background: rgba(10, 21, 38, 0.7);
-            padding: 8px 15px;
+            flex-direction: column;
+            gap: 5px;
+            background: rgba(10, 21, 38, 0.85);
+            padding: 6px 12px;
             border-radius: 6px;
             border: 1px solid rgba(0, 255, 204, 0.3);
             backdrop-filter: blur(4px);
@@ -59,21 +70,25 @@
         #leftStats { color: #00ffcc; }
         #rightStats { color: #ff0077; }
         
-        /* Difficulty Selection Screen Overlays */
+        /* Menu Screen Overlays */
         #menuOverlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 5, 13, 0.85);
+            background: rgba(5, 5, 13, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 10;
             backdrop-filter: blur(8px);
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
         }
         #menuOverlay h1 {
             color: #00ffcc;
-            font-size: 38px;
+            font-size: 7vw;
+            max-size: 38px;
             margin-bottom: 5px;
             text-shadow: 0 0 15px #00ffcc;
             letter-spacing: 3px;
@@ -81,39 +96,83 @@
         #menuOverlay p {
             color: #8fa0b5;
             margin-bottom: 30px;
-            font-size: 14px;
+            font-size: 12px;
             letter-spacing: 1px;
         }
         .btn-group {
             display: flex;
-            gap: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .diff-btn {
             background: transparent;
             color: #fff;
             border: 2px solid #00ffcc;
-            padding: 12px 30px;
-            font-size: 18px;
+            padding: 10px 20px;
+            font-size: 16px;
             font-family: 'Courier New', monospace;
             font-weight: bold;
             cursor: pointer;
             border-radius: 6px;
             transition: all 0.3s ease;
-            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
         }
         .diff-btn:hover {
             background: #00ffcc;
             color: #05050d;
-            box-shadow: 0 0 20px #00ffcc;
         }
-        #hardBtn {
-            border-color: #ff0077;
-            box-shadow: 0 0 10px rgba(255, 0, 119, 0.2);
+        #hardBtn { border-color: #ff0077; }
+        #hardBtn:hover { background: #ff0077; color: #fff; }
+
+        /* Mobile On-Screen Keyboard Styling */
+        #mobileKeyboard {
+            display: none;
+            width: 100vw;
+            background: #0a0a1a;
+            padding: 8px 0;
+            box-sizing: border-box;
+            border-top: 2px solid #00ffcc;
+            margin-top: auto;
         }
-        #hardBtn:hover {
-            background: #ff0077;
-            color: #fff;
-            box-shadow: 0 0 20px #ff0077;
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 5px;
+            gap: 4px;
+        }
+        .key-btn {
+            background: #12122b;
+            color: #00ffcc;
+            border: 1px solid rgba(0, 255, 204, 0.4);
+            border-radius: 4px;
+            padding: 12px 0;
+            width: 8.5vw;
+            max-width: 40px;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: monospace;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        .key-btn:active {
+            background: #00ffcc;
+            color: #05050d;
+            box-shadow: 0 0 10px #00ffcc;
+        }
+
+        /* Responsive UI Adjustments */
+        @media (min-width: 768px) {
+            #uiLayer { font-size: 18px; top: 15px; left: 15px; right: 15px; }
+            .stats-group { flex-direction: row; gap: 20px; padding: 8px 15px; }
+            #menuOverlay h1 { font-size: 38px; }
+            #mobileKeyboard { display: none !important; } /* Desktop par keyboard hide */
+            #gameContainer { height: 650px; margin-top: 0; }
+            body { justify-content: center; }
+        }
+        @media (max-width: 767px) {
+            #mobileKeyboard { display: block; } /* Mobile par keyboard show */
         }
     </style>
 </head>
@@ -146,6 +205,42 @@
     <canvas id="gameCanvas" width="900" height="650"></canvas>
 </div>
 
+<!-- Mobile Screen Keyboard Layout -->
+<div id="mobileKeyboard">
+    <div class="keyboard-row">
+        <div class="key-btn" onclick="handleVirtualKey('q')">Q</div>
+        <div class="key-btn" onclick="handleVirtualKey('w')">W</div>
+        <div class="key-btn" onclick="handleVirtualKey('e')">E</div>
+        <div class="key-btn" onclick="handleVirtualKey('r')">R</div>
+        <div class="key-btn" onclick="handleVirtualKey('t')">T</div>
+        <div class="key-btn" onclick="handleVirtualKey('y')">Y</div>
+        <div class="key-btn" onclick="handleVirtualKey('u')">U</div>
+        <div class="key-btn" onclick="handleVirtualKey('i')">I</div>
+        <div class="key-btn" onclick="handleVirtualKey('o')">O</div>
+        <div class="key-btn" onclick="handleVirtualKey('p')">P</div>
+    </div>
+    <div class="keyboard-row">
+        <div class="key-btn" onclick="handleVirtualKey('a')">A</div>
+        <div class="key-btn" onclick="handleVirtualKey('s')">S</div>
+        <div class="key-btn" onclick="handleVirtualKey('d')">D</div>
+        <div class="key-btn" onclick="handleVirtualKey('f')">F</div>
+        <div class="key-btn" onclick="handleVirtualKey('g')">G</div>
+        <div class="key-btn" onclick="handleVirtualKey('h')">H</div>
+        <div class="key-btn" onclick="handleVirtualKey('j')">J</div>
+        <div class="key-btn" onclick="handleVirtualKey('k')">K</div>
+        <div class="key-btn" onclick="handleVirtualKey('l')">L</div>
+    </div>
+    <div class="keyboard-row">
+        <div class="key-btn" onclick="handleVirtualKey('z')">Z</div>
+        <div class="key-btn" onclick="handleVirtualKey('x')">X</div>
+        <div class="key-btn" onclick="handleVirtualKey('c')">C</div>
+        <div class="key-btn" onclick="handleVirtualKey('v')">V</div>
+        <div class="key-btn" onclick="handleVirtualKey('b')">B</div>
+        <div class="key-btn" onclick="handleVirtualKey('n')">N</div>
+        <div class="key-btn" onclick="handleVirtualKey('m')">M</div>
+    </div>
+</div>
+
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -169,7 +264,6 @@ let totalWordsTyped = 0;
 let correctKeys = 0;
 let totalKeysPressed = 0;
 
-// Configs based on difficulty selection
 let difficultySettings = {
     speedModifier: 1,
     spawnRateModifier: 1
@@ -203,7 +297,6 @@ const player = {
     laserSide: true
 };
 
-// Generate Ambient Space Stars
 for(let i=0; i<60; i++) {
     stars.push({
         x: Math.random() * canvas.width,
@@ -244,7 +337,7 @@ class Enemy {
         this.word = wordsList[Math.floor(Math.random() * wordsList.length)];
         this.remainingText = this.word;
         this.typedText = "";
-        this.x = Math.random() * (canvas.width - 220) + 110;
+        this.x = Math.random() * (canvas.width - 240) + 70;
         this.y = -30;
         let baseSpeed = Math.random() * 0.3 + 0.3;
         this.speed = (baseSpeed * difficultySettings.speedModifier) + (score * 0.00015);
@@ -459,12 +552,8 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-window.addEventListener('keydown', (e) => {
-    if (!gameActive) return;
-    
-    let key = e.key.toLowerCase();
-    if (key.length !== 1) return;
-
+// Main logic functions trigger core keystrokes
+function processInputKey(key) {
     totalKeysPressed++;
 
     if (targetEnemy === null) {
@@ -516,7 +605,21 @@ window.addEventListener('keydown', (e) => {
         let accuracyPct = Math.round((correctKeys / totalKeysPressed) * 100);
         accuracyEl.innerText = accuracyPct + "%";
     }
+}
+
+// Laptop/Desktop Physical Keyboard Input
+window.addEventListener('keydown', (e) => {
+    if (!gameActive) return;
+    let key = e.key.toLowerCase();
+    if (key.length !== 1) return;
+    processInputKey(key);
 });
+
+// Mobile Touch Virtual Keyboard Input
+function handleVirtualKey(key) {
+    if (!gameActive) return;
+    processInputKey(key);
+}
 </script>
 </body>
 </html>
